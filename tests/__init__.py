@@ -1,0 +1,1 @@
+"""Microscope application test suite."""

@@ -1,0 +1,54 @@
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ==== Virtual env ====
+.venv/
+venv/
+env/
+ENV/
+
+# ==== Testing / Coverage ====
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+.coverage.xml
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+
+# ==== IDE / Editors ====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==== Claude / agent local state ====
+.claude/
+
+# ==== macOS ====
+.DS_Store
+.AppleDouble
+.LSOverride
+*~Snapshots
+
+# ==== Logs ====
+*.log
+logs/
+
+# ==== Captures (user-generated media) ====
+Microscope Captures/
+
+# ==== Kilo local state (keep config, ignore runtime) ====
+.kilo/agent-manager.json
+.kilo/worktrees/
+.kilo/node_modules/
+.kilo/package-lock.json
+.kilo/package.json
