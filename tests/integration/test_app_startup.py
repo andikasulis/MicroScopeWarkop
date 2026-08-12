@@ -55,3 +55,25 @@ class TestAppStartup:
             assert window._start_stop_btn.text() in ("Start", "Stop")
         finally:
             window.close()
+
+    def test_fullscreen_button_exists(
+        self, config: AppConfig, qapp: QApplication
+    ) -> None:
+        window = MainWindow(config)
+        try:
+            assert window._fullscreen_btn.text() == "Fullscreen"
+        finally:
+            window.close()
+
+    def test_fullscreen_toggle(
+        self, config: AppConfig, qapp: QApplication
+    ) -> None:
+        window = MainWindow(config)
+        try:
+            window.show()
+            window._toggle_fullscreen()
+            assert window.isFullScreen() is True
+            window._toggle_fullscreen()
+            assert window.isFullScreen() is False
+        finally:
+            window.close()

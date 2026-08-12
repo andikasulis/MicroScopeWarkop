@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QThread
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -70,6 +70,16 @@ class MainWindow(QMainWindow):
         self._start_stop_btn.setEnabled(False)
         self._start_stop_btn.clicked.connect(self._toggle_camera)
         toolbar.addWidget(self._start_stop_btn)
+
+        self._fullscreen_btn = QPushButton("Fullscreen")
+        self._fullscreen_btn.setCheckable(True)
+        self._fullscreen_btn.clicked.connect(self._toggle_fullscreen)
+        toolbar.addWidget(self._fullscreen_btn)
+
+        shortcut = QShortcut(QKeySequence("F11"), self)
+        shortcut.activated.connect(self._toggle_fullscreen)
+        shortcut_f = QShortcut(QKeySequence("f"), self)
+        shortcut_f.activated.connect(self._toggle_fullscreen)
 
         toolbar.addStretch()
         layout.addLayout(toolbar)
@@ -219,6 +229,17 @@ class MainWindow(QMainWindow):
 
     def _on_zoom(self, label: str) -> None:
         self._camera_view.set_zoom(label)
+
+    def _toggle_fullscreen(self) -> None:
+        """Toggle full-screen mode (F11 or 'f', or the toolbar button)."""
+        if self.isFullScreen():
+            self.showNormal()
+            self._fullscreen_btn.setChecked(False)
+            self._fullscreen_btn.setText("Fullscreen")
+        else:
+            self.showFullScreen()
+            self._fullscreen_btn.setChecked(True)
+            self._fullscreen_btn.setText("Exit Fullscreen")
 
     def _on_overlay_toggle(self, name: str, enabled: bool) -> None:
         self._camera_view.set_overlay(name, enabled)

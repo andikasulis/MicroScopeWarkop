@@ -117,13 +117,19 @@ class CameraView(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
         else:
-            # Above 100%: magnify then center-crop to the label.
-            filled = zoomed.scaled(
-                label_size,
-                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            # Above 100%: magnify. The zoomed frame is scaled to a target
+            # proportional to the zoom level, then center-cropped to the
+            # label. Higher levels show a smaller region at larger scale, so
+            # 200% vs 400% are visibly different.
+            target_w = max(1, round(label_size.width() * self._zoom_factor))
+            target_h = max(1, round(label_size.height() * self._zoom_factor))
+            scaled = zoomed.scaled(
+                target_w,
+                target_h,
+                Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            fitted = self._center_crop(filled, label_size.width(), label_size.height())
+            fitted = self._center_crop(scaled, label_size.width(), label_size.height())
 
         if not self._show_crosshair and not self._show_grid:
             return fitted

@@ -102,9 +102,39 @@ class TestCameraView:
 
             view.set_zoom("200%")
             out_200 = view._render(base, 320, 240)
-            # zoomed frame (640x480 scaled to fill label) is center-cropped to label
             assert out_200.width() == 640
             assert out_200.height() == 480
+        finally:
+            view.close()
+
+    def test_zoom_levels_produce_different_images(
+        self, qapp: QCoreApplication,
+    ) -> None:
+        """200% and 400% must visibly differ (not look identical)."""
+        import numpy as np
+        from PySide6.QtGui import QImage, QPixmap
+
+        view = CameraView()
+        try:
+            view.resize(400, 300)
+            view._frame_label.resize(400, 300)
+
+            # High-contrast frame: left half white, right half black.
+            h, w = 100, 200
+            arr = np.zeros((h, w, 3), dtype=np.uint8)
+            arr[:, : w // 2] = 255
+            contig = np.ascontiguousarray(arr)
+            img = QImage(contig.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+            base = QPixmap.fromImage(img)
+
+            view.set_zoom("200%")
+            p200 = view._render(base, w, h)
+            view.set_zoom("400%")
+            p400 = view._render(base, w, h)
+
+            c200 = p200.toImage().pixelColor(200, 150)
+            c400 = p400.toImage().pixelColor(200, 150)
+            assert c200 != c400, "200% and 400% should render differently"
         finally:
             view.close()
 
