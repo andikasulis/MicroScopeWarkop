@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from PySide6.QtCore import QCoreApplication
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication
 
 from microscope.ui.camera_view import CameraView
@@ -82,6 +83,28 @@ class TestCameraView:
             view.display_frame(np.zeros((240, 320, 3), dtype=np.uint8))
             view.set_zoom("200%")  # must re-render without error
             assert view.zoom_factor == 2.0
+        finally:
+            view.close()
+
+    def test_render_zoom_above_100_crops_not_shrinks(self, qapp: QCoreApplication) -> None:
+        from PySide6.QtGui import QPixmap
+
+        view = CameraView()
+        try:
+            view.resize(640, 480)
+            view._frame_label.resize(640, 480)
+            base = QPixmap(320, 240)
+            base.fill(QColor(255, 255, 255))
+
+            view.set_zoom("100%")
+            out_100 = view._render(base, 320, 240)
+            assert out_100.width() == 640  # fit to label
+
+            view.set_zoom("200%")
+            out_200 = view._render(base, 320, 240)
+            # zoomed frame (640x480 scaled to fill label) is center-cropped to label
+            assert out_200.width() == 640
+            assert out_200.height() == 480
         finally:
             view.close()
 

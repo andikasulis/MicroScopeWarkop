@@ -92,7 +92,12 @@ class CameraView(QWidget):
             self._fps_label.show()
 
     def _render(self, base: QPixmap, frame_w: int, frame_h: int) -> QPixmap:
-        """Build the displayed pixmap: zoom + overlays."""
+        """Build the displayed pixmap: zoom + overlays.
+
+        Zoom is a real magnification: the zoomed frame is scaled to fill the
+        label (cropping overflow) instead of being shrunk back to fit, so
+        higher zoom levels visibly enlarge the image.
+        """
         zoomed = base.scaled(
             max(1, round(frame_w * self._zoom_factor)),
             max(1, round(frame_h * self._zoom_factor)),
@@ -104,11 +109,21 @@ class CameraView(QWidget):
         if label_size.width() <= 0 or label_size.height() <= 0:
             return zoomed
 
-        fitted = zoomed.scaled(
-            label_size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
+        if self._zoom_factor <= 1.0:
+            # 100% or below: show the whole frame, fit down.
+            fitted = zoomed.scaled(
+                label_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        else:
+            # Above 100%: magnify then center-crop to the label.
+            filled = zoomed.scaled(
+                label_size,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            fitted = self._center_crop(filled, label_size.width(), label_size.height())
 
         if not self._show_crosshair and not self._show_grid:
             return fitted
@@ -139,6 +154,16 @@ class CameraView(QWidget):
 
         painter.end()
         return canvas
+
+    @staticmethod
+    def _center_crop(pixmap: QPixmap, width: int, height: int) -> QPixmap:
+        """Return a center-cropped copy of `pixmap` sized (width, height)."""
+        src_w, src_h = pixmap.width(), pixmap.height()
+        if src_w <= width and src_h <= height:
+            return pixmap
+        x = max(0, (src_w - width) // 2)
+        y = max(0, (src_h - height) // 2)
+        return pixmap.copy(x, y, min(width, src_w), min(height, src_h))
 
     def update_fps(self, fps: float) -> None:
         """Update the displayed FPS value.
