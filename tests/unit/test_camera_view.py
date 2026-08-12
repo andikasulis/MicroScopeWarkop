@@ -75,6 +75,16 @@ class TestCameraView:
         finally:
             view.close()
 
+    def test_zoom_rerenders_last_frame(self, qapp: QCoreApplication) -> None:
+        view = CameraView()
+        try:
+            view.resize(640, 480)
+            view.display_frame(np.zeros((240, 320, 3), dtype=np.uint8))
+            view.set_zoom("200%")  # must re-render without error
+            assert view.zoom_factor == 2.0
+        finally:
+            view.close()
+
     def test_zoom_ignores_invalid(self, qapp: QCoreApplication) -> None:
         view = CameraView()
         try:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Final
 
+import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
@@ -35,6 +36,7 @@ class CameraView(QWidget):
         self._show_crosshair = False
         self._show_grid = False
         self._processor = FrameProcessor()
+        self._last_frame: np.ndarray | None = None
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(320, 240)
@@ -75,6 +77,7 @@ class CameraView(QWidget):
         if h <= 0 or w <= 0:
             return
 
+        self._last_frame = frame_bgr
         frame_contig = np.ascontiguousarray(frame_bgr)
         processed = np.ascontiguousarray(self._processor.process(frame_contig))
         bytes_per_line = 3 * w
@@ -147,12 +150,18 @@ class CameraView(QWidget):
         self._fps_label.setText(self._fps_text)
 
     def set_zoom(self, label: str) -> None:
-        """Set zoom level from a display label like '200%'."""
+        """Set zoom level from a display label like '200%'.
+
+        Re-renders the last displayed frame immediately so the new zoom
+        takes effect even while the preview is paused.
+        """
         factor = _ZOOM_LEVELS.get(label)
         if factor is None:
             return
         self._zoom_factor = factor
         self._zoom_label = label
+        if self._last_frame is not None:
+            self.display_frame(self._last_frame)
 
     @property
     def zoom_factor(self) -> float:
@@ -175,6 +184,7 @@ class CameraView(QWidget):
 
     def clear(self) -> None:
         """Clear the current frame and show the placeholder."""
+        self._last_frame = None
         self._fps_label.hide()
         self._show_placeholder()
 
