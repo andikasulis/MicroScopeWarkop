@@ -80,7 +80,32 @@ class TestCameraWorkerStart:
             worker = CameraWorker(camera_index=0)
             worker.start()
             worker.set_control("brightness", 80.0)
-            mock_mgr.set_control.assert_called_once_with("brightness", 80.0)
+            # UI 0..100 maps to native 0..255 => 80% -> 204.0
+            mock_mgr.set_control.assert_called_once_with("brightness", 204.0)
+            worker.stop()
+
+    def test_set_control_uses_fallback_range(self, app: QCoreApplication) -> None:
+        mock_mgr = self._make_mock_manager()
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=mock_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            worker.set_control("contrast", 50.0)  # 50% of 0..255 => 127.5
+            mock_mgr.set_control.assert_called_once_with("contrast", 127.5)
+            worker.stop()
+
+    def test_controls_supported_empty_when_not_running(self) -> None:
+        worker = CameraWorker()
+        assert worker.controls_supported == set()
+
+    def test_controls_supported_from_capabilities(self, app: QCoreApplication) -> None:
+        mock_mgr = self._make_mock_manager()
+        from microscope.camera.camera_types import CameraCapabilities
+
+        mock_mgr.current_capabilities = CameraCapabilities(brightness=True, focus=True)
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=mock_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            assert worker.controls_supported == {"brightness", "focus"}
             worker.stop()
 
     def test_start_recording_requires_running_camera(self, app: QCoreApplication) -> None:

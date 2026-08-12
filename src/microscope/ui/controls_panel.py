@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QFormLayout,
     QGroupBox,
@@ -80,13 +81,19 @@ class ControlsPanel(QWidget):
         box = QGroupBox("Zoom")
         layout = QVBoxLayout(box)
         row = QHBoxLayout()
+
+        # Radio-like behavior: only one zoom level can be active at a time.
+        self._zoom_group = QButtonGroup(self)
+        self._zoom_group.setExclusive(True)
+
         for label in ["25%", "50%", "100%", "200%", "400%"]:
             btn = QPushButton(label)
             btn.setCheckable(True)
+            self._zoom_group.addButton(btn)
             btn.clicked.connect(lambda _checked, z=label: self._on_zoom(z))
             if label == "100%":
                 btn.setChecked(True)
-            layout.addWidget(btn)
+            row.addWidget(btn)
         layout.addLayout(row)
         return box
 
@@ -142,3 +149,11 @@ class ControlsPanel(QWidget):
         """Enable/disable camera controls based on capture state."""
         for slider in self._sliders.values():
             slider.setEnabled(capturing)
+
+    def set_supported_controls(self, supported: set[str]) -> None:
+        """Disable sliders whose camera does not support the hardware control.
+
+        An empty set (camera reports no capabilities) disables all sliders.
+        """
+        for name, slider in self._sliders.items():
+            slider.setEnabled(name in supported)

@@ -150,6 +150,7 @@ class MainWindow(QMainWindow):
         self._worker.fps_updated.connect(self._camera_view.update_fps)
         self._worker.camera_error.connect(self._on_camera_error)
         self._worker.recording_changed.connect(self._controls.set_recording_state)
+        self._worker.control_request.connect(self._worker.set_control)
         self._worker.set_capture_dir(self._config.default_capture_dir)
 
         self._worker_thread = QThread()
@@ -162,7 +163,7 @@ class MainWindow(QMainWindow):
 
         self._start_stop_btn.setText("Stop")
         self._controls.setEnabled(True)
-        self._controls.set_enabled_state(True)
+        self._controls.set_supported_controls(self._worker.controls_supported)
         self._status_label.setText("Live preview active.")
         self._status_label.setStyleSheet("color: #64dd3a;")
 
@@ -200,7 +201,8 @@ class MainWindow(QMainWindow):
 
     def _on_control_changed(self, name: str, value: float) -> None:
         if self._worker is not None:
-            self._worker.set_control(name, value)
+            # Emit on the UI thread; executes set_control on the worker thread.
+            self._worker.control_request.emit(name, value)
 
     def _toggle_recording(self) -> None:
         if self._worker is None:

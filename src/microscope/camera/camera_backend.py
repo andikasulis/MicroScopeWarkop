@@ -24,6 +24,17 @@ _CV2_PROP_WHITE_BALANCE = getattr(cv2, "CAP_PROP_WB_TEMPERATURE", 17)
 _CV2_PROP_FOCUS = getattr(cv2, "CAP_PROP_FOCUS", 28)
 _CV2_PROP_ZOOM = getattr(cv2, "CAP_PROP_ZOOM", 27)
 
+# Fallback native ranges used when the camera does not report min/max.
+# brightness/contrast/saturation are typically 0..255; other controls vary.
+_FALLBACK_RANGE: dict[str, tuple[float, float]] = {
+    "brightness": (0.0, 255.0),
+    "contrast": (0.0, 255.0),
+    "saturation": (0.0, 255.0),
+    "exposure": (0.0, 1.0),
+    "focus": (0.0, 255.0),
+    "zoom": (1.0, 100.0),
+}
+
 _BACKEND_NAME_MAP: dict[int, str] = {
     0: "Default",
     200: "AVFoundation",
@@ -212,6 +223,23 @@ def set_control(cap: cv2.VideoCapture, name: str, value: float) -> bool:
     if prop_id is None:
         return False
     return set_property(cap, prop_id, value)
+
+
+def control_range(name: str) -> tuple[float, float]:
+    """Return the native (min, max) range for a named control.
+
+    Uses conservative fallbacks; individual cameras may differ.
+    """
+    return _FALLBACK_RANGE.get(name, (0.0, 1.0))
+
+
+def normalize_control(name: str, ui_value: float) -> float:
+    """Map a UI slider value (0..100) to the control's native range."""
+    lo, hi = control_range(name)
+    if hi == lo:
+        return lo
+    # Include the whole native span, not just the top of it.
+    return lo + (hi - lo) * (ui_value / 100.0)
 
 
 def set_resolution(cap: cv2.VideoCapture, width: int, height: int) -> bool:

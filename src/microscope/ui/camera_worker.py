@@ -40,6 +40,7 @@ class CameraWorker(QObject):
     fps_updated = Signal(float)
     camera_error = Signal(str)
     recording_changed = Signal(bool)
+    control_request = Signal(str, float)
 
     def __init__(self, camera_index: int = 0, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -81,6 +82,16 @@ class CameraWorker(QObject):
     def is_running(self) -> bool:
         """Return True when the capture loop is active."""
         return self._running
+
+    @property
+    def controls_supported(self) -> set[str]:
+        """Return the set of camera controls this device supports.
+
+        Empty when the camera is closed or reports no capabilities.
+        """
+        if self._manager is None or self._manager.current_capabilities is None:
+            return set()
+        return set(self._manager.current_capabilities.supported_properties)
 
     def start(self) -> bool:
         """Open the camera and begin timer-driven capture.
@@ -180,11 +191,16 @@ class CameraWorker(QObject):
     def set_control(self, name: str, value: float) -> None:
         """Set a named camera control.
 
-        Runs on the worker thread so the camera I/O never blocks the UI thread.
+        Runs on the worker thread because it is invoked via the
+        `control_request` signal (auto-queued across threads). The UI
+        slider value (0..100) is mapped to the control's native range.
         """
         if self._manager is None:
             return
-        self._manager.set_control(name, value)
+        from microscope.camera.camera_backend import normalize_control
+
+        native = normalize_control(name, value)
+        self._manager.set_control(name, native)
 
     def _process_one_tick(self) -> bool:
         """Read a single frame. Public for testability.
