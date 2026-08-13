@@ -31,6 +31,20 @@ class TestVideoRecorder:
             assert rec.start() is False
             assert rec.is_recording is False
 
+    def test_start_falls_back_to_avi_when_mp4_unavailable(self) -> None:
+        closed = MagicMock()
+        closed.isOpened.return_value = False
+        opened = MagicMock()
+        opened.isOpened.return_value = True
+        with patch(
+            "microscope.recording.recorder.cv2.VideoWriter",
+            side_effect=[closed, opened],
+        ):
+            rec = VideoRecorder(Path("/tmp/y.mp4"), (640, 480))
+            assert rec.start() is True
+            assert rec.is_recording is True
+            assert rec.path.suffix == ".avi"
+
     def test_write_frame_when_recording(self) -> None:
         mock_writer = MagicMock()
         mock_writer.isOpened.return_value = True

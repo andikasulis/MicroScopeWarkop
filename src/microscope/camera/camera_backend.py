@@ -7,6 +7,9 @@ No Qt dependencies — this runs outside the UI thread per architectural rule #1
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
+from functools import lru_cache
 
 import cv2
 import numpy as np
@@ -38,6 +41,7 @@ _FALLBACK_RANGE: dict[str, tuple[float, float]] = {
 _BACKEND_NAME_MAP: dict[int, str] = {
     0: "Default",
     200: "AVFoundation",
+    1200: "AVFoundation",
     300: "V4L2",
     400: "MSMF",
     500: "DirectShow",
@@ -91,8 +95,53 @@ def enumerate_cameras(max_devices: int = 10) -> list[CameraInfo]:
     return devices
 
 
+@lru_cache(maxsize=1)
+def _discover_macos_device_names() -> tuple[str, ...]:
+    """Return the list of connected camera names on macOS (best-effort).
+
+    Uses `system_profiler SPCameraDataType`, which lists actual device names
+    (e.g. "FaceTime HD Camera") unavailable through OpenCV. Falls back to an
+    empty list if the command fails or is not available (non-macOS).
+    """
+    import os
+
+    if sys.platform != "darwin":
+        return ()
+
+    try:
+        result = subprocess.run(
+            ["system_profiler", "SPCameraDataType"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env={**os.environ, "LANG": "C"},
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ()
+
+    names: list[str] = []
+    for line in result.stdout.splitlines():
+        raw = line.rstrip()
+        stripped = raw.strip()
+        # Device name lines are indented (start with whitespace) and end
+        # with ':' (e.g. "    FaceTime HD Camera:"). The "Camera:" root line
+        # is not indented and is skipped.
+        if (
+            raw.startswith(" ")
+            and stripped.endswith(":")
+            and not stripped.endswith("::")
+        ):
+            candidate = stripped[:-1].strip()
+            if candidate:
+                names.append(candidate)
+    return tuple(names)
+
+
 def _read_device_name(cap: cv2.VideoCapture, idx: int, backend: str) -> str:
     del cap
+    names = _discover_macos_device_names()
+    if idx < len(names):
+        return names[idx]
     return f"Camera {idx} ({backend})"
 
 

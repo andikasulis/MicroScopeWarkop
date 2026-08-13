@@ -16,7 +16,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_FOURCC = "mp4v"  # MP4 container; widely supported by OpenCV builds.
+# (fourcc, filename suffix) attempts in order. mp4v/MP4 is preferred; MJPG/AVI
+# is a robust fallback where MP4 encoding is unavailable (e.g. some Linux).
+_CODEC_FALLBACK: tuple[tuple[str, str], ...] = (
+    ("mp4v", ".mp4"),
+    ("MJPG", ".avi"),
+)
 
 
 class VideoRecorder:
@@ -30,6 +35,7 @@ class VideoRecorder:
     """
 
     def __init__(self, path: Path, frame_size: tuple[int, int], fps: float = 30.0) -> None:
+        self._requested_path = path
         self._path = path
         self._frame_size = frame_size
         self._fps = fps
@@ -47,26 +53,33 @@ class VideoRecorder:
     def start(self) -> bool:
         """Open the output file for writing.
 
-        Returns True if the writer started successfully.
+        Tries MP4 first, then falls back to AVI/MJPG so recording works
+        across platforms. Returns True if a writer started successfully.
         """
         if self._recording:
             return True
 
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        writer = cv2.VideoWriter(
-            str(self._path),
-            cv2.VideoWriter_fourcc(*_FOURCC),  # type: ignore[attr-defined]
-            self._fps,
-            self._frame_size,
-        )
-        if not writer.isOpened():
-            logger.error("Failed to open video writer at %s", self._path)
-            return False
 
-        self._writer = writer
-        self._recording = True
-        logger.info("Recording started: %s", self._path)
-        return True
+        for fourcc, suffix in _CODEC_FALLBACK:
+            candidate = self._requested_path.with_suffix(suffix)
+            writer = cv2.VideoWriter(
+                str(candidate),
+                cv2.VideoWriter_fourcc(*fourcc),  # type: ignore[attr-defined]
+                self._fps,
+                self._frame_size,
+            )
+            if writer.isOpened():
+                self._path = candidate
+                self._writer = writer
+                self._recording = True
+                logger.info("Recording started: %s (%s)", self._path, fourcc)
+                return True
+            writer.release()
+            logger.warning("Codec %s unavailable, trying next", fourcc)
+
+        logger.error("No usable video codec for %s", self._requested_path)
+        return False
 
     def write_frame(self, frame: np.ndarray) -> None:
         """Write a single frame to the video file (no-op if not recording)."""
