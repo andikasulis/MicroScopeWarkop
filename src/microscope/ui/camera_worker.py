@@ -41,6 +41,7 @@ class CameraWorker(QObject):
     camera_error = Signal(str)
     recording_changed = Signal(bool)
     control_request = Signal(str, float)
+    connection_status = Signal(str)
 
     def __init__(self, camera_index: int = 0, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -58,6 +59,8 @@ class CameraWorker(QObject):
         self._latest_frame: np.ndarray | None = None
         self._recorder: VideoRecorder | None = None
         self._capture_dir: Path = Path.home() / "Microscope Captures"
+        self._reconnect_call: QTimer | None = None
+        self._reconnect_interval_ms = 1000
 
     @property
     def camera_info(self) -> CameraInfo | None:
@@ -112,6 +115,7 @@ class CameraWorker(QObject):
         self._frame_count = 0
         self._fps_start = time.monotonic()
         self._timer.start()
+        self.connection_status.emit("live")
         return True
 
     @Slot()
@@ -123,9 +127,11 @@ class CameraWorker(QObject):
         on its owning thread (avoids the 'killTimer' warning).
         """
         self._running = False
+        self._cancel_reconnect()
         if self._timer.isActive():
             self._timer.stop()
         self.stop_recording()
+        self.connection_status.emit("stopped")
 
         if self._manager is not None:
             self._manager.close_device()
@@ -202,6 +208,46 @@ class CameraWorker(QObject):
         native = normalize_control(name, value)
         self._manager.set_control(name, native)
 
+    def _schedule_reconnect(self) -> None:
+        """Schedule a reconnect attempt on the worker thread (delayed)."""
+        if not self._running:
+            return
+        self._timer.stop()
+        self.connection_status.emit("reconnecting")
+        self._reconnect_call = QTimer()
+        self._reconnect_call.setSingleShot(True)
+        self._reconnect_call.timeout.connect(self._try_reconnect)
+        self._reconnect_call.start(self._reconnect_interval_ms)
+
+    @Slot()
+    def _try_reconnect(self) -> None:
+        """Attempt to re-open the camera after a drop."""
+        self._reconnect_call = None
+        if not self._running:
+            return
+
+        if self._manager is not None:
+            self._manager.close_device()
+
+        self._manager = CameraManager()
+        self._manager.open_device_by_index(self._camera_index)
+
+        if not self._manager.is_opened:
+            # Keep retrying silently until the device comes back.
+            QTimer.singleShot(self._reconnect_interval_ms, self._try_reconnect)
+            return
+
+        self._frame_count = 0
+        self._fps_start = time.monotonic()
+        self._timer.start()
+        self.connection_status.emit("live")
+
+    def _cancel_reconnect(self) -> None:
+        if self._reconnect_call is not None:
+            self._reconnect_call.stop()
+            self._reconnect_call.deleteLater()
+            self._reconnect_call = None
+
     def _process_one_tick(self) -> bool:
         """Read a single frame. Public for testability.
 
@@ -217,9 +263,10 @@ class CameraWorker(QObject):
         frame = self._manager.read_frame()
 
         if frame is None:
-            self._running = False
-            self._timer.stop()
-            self.camera_error.emit("Camera disconnected or frame read failed")
+            # Camera dropped. Keep the worker alive and retry until the user
+            # presses Stop; do not tear down the thread.
+            self.camera_error.emit("Camera disconnected — reconnecting…")
+            self._schedule_reconnect()
             return False
 
         self.frame_ready.emit(frame)

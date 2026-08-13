@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         self._worker.frame_ready.connect(self._camera_view.display_frame)
         self._worker.fps_updated.connect(self._camera_view.update_fps)
         self._worker.camera_error.connect(self._on_camera_error)
+        self._worker.connection_status.connect(self._on_connection_status)
         self._worker.recording_changed.connect(self._controls.set_recording_state)
         self._worker.control_request.connect(self._worker.set_control)
         self._worker.set_capture_dir(self._config.default_capture_dir)
@@ -198,13 +199,26 @@ class MainWindow(QMainWindow):
         self._status_label.setStyleSheet("color: #888888;")
 
     def _on_camera_error(self, message: str) -> None:
-        self._status_label.setText(f"Error: {message}")
-        self._status_label.setStyleSheet("color: #ff4444;")
-        self._camera_view.clear()
-        if self._worker is not None:
-            self._worker.stop_from_main_thread()
-        self._worker = None
-        self._start_stop_btn.setText("Start")
+        # Camera dropped; the worker keeps trying to reconnect in the
+        # background. Show status; Stop cancels retries. Do not kill the worker.
+        self._status_label.setText(message)
+        self._status_label.setStyleSheet("color: #ff8800;")
+
+    def _on_connection_status(self, status: str) -> None:
+        if status == "live":
+            self._status_label.setText("Live preview active.")
+            self._status_label.setStyleSheet("color: #64dd3a;")
+            self._camera_view.clear()
+            if self._worker is not None:
+                self._controls.set_supported_controls(self._worker.controls_supported)
+            self._controls.setEnabled(True)
+        elif status == "reconnecting":
+            self._controls.setEnabled(False)
+            self._camera_view.set_overlay("crosshair", False)
+            self._status_label.setText("Camera disconnected — reconnecting…")
+            self._status_label.setStyleSheet("color: #ff8800;")
+        elif status == "stopped":
+            self._start_stop_btn.setText("Start")
 
     def _is_capturing(self) -> bool:
         return self._worker is not None and self._worker.is_running

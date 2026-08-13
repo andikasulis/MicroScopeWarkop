@@ -218,3 +218,81 @@ class TestCameraWorkerStart:
             for val in fps_values:
                 assert val >= 0.0
             worker.stop()
+
+
+class TestCameraWorkerReconnect:
+    @pytest.fixture
+    def app(self) -> QCoreApplication:
+        return QCoreApplication.instance() or QCoreApplication([])
+
+    def test_tick_frame_none_schedules_reconnect(self, app: QCoreApplication) -> None:
+        mock_mgr = MagicMock()
+        mock_mgr.is_opened = True
+        mock_mgr.read_frame.return_value = None
+
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=mock_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            statuses: list[str] = []
+            worker.connection_status.connect(statuses.append)
+
+            result = worker._process_one_tick()
+            assert result is False
+            # Still running (user has not pressed Stop); reconnect scheduled.
+            assert worker.is_running is True
+            assert "reconnecting" in statuses
+            worker.stop()
+
+    def test_try_reconnect_success_resumes(self, app: QCoreApplication) -> None:
+        mock_mgr = MagicMock()
+        mock_mgr.is_opened = True
+        mock_mgr.read_frame.return_value = np.zeros((2, 2, 3), dtype=np.uint8)
+
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=mock_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            statuses: list[str] = []
+            worker.connection_status.connect(statuses.append)
+
+            worker._manager = mock_mgr
+            worker._timer.stop()
+            worker._try_reconnect()
+
+            assert worker.is_running is True
+            assert "live" in statuses
+            worker.stop()
+
+    def test_try_reconnect_failure_keeps_running(self, app: QCoreApplication) -> None:
+        failed_mgr = MagicMock()
+        failed_mgr.is_opened = False
+        failed_mgr.read_frame.return_value = None
+
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=failed_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            # Force break so we can control reconnect path deterministically.
+            worker._running = True
+            worker._manager = failed_mgr
+
+            worker._try_reconnect()
+            # Camera not back; remains running to keep retrying.
+            assert worker.is_running is True
+            worker.stop()
+
+    def test_stop_cancels_reconnect(self, app: QCoreApplication) -> None:
+        mock_mgr = MagicMock()
+        mock_mgr.is_opened = True
+        mock_mgr.read_frame.return_value = None
+
+        with patch("microscope.ui.camera_worker.CameraManager", return_value=mock_mgr):
+            worker = CameraWorker(camera_index=0)
+            worker.start()
+            statuses: list[str] = []
+            worker.connection_status.connect(statuses.append)
+
+            worker._process_one_tick()  # triggers _schedule_reconnect
+            worker.stop()
+
+            assert worker.is_running is False
+            assert worker._reconnect_call is None or not worker._reconnect_call.isActive()
+            assert "stopped" in statuses
