@@ -7,9 +7,11 @@ dist/
 *.egg-info/
 *.egg
 
-# ==== Build output (app bundle is pushed intentionally) ====
+# ==== Build output (app bundle .zip is pushed intentionally) ====
 build/
 !build/*.app/
+dist/
+!dist/WarkopMicroscope.app.zip
 
 # ==== Virtual env ====
 .venv/
