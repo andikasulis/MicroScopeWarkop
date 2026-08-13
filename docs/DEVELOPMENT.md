@@ -81,13 +81,17 @@ open htmlcov/index.html
 ```
 QApplication (app/application.py)
     └── MainWindow (ui/main_window.py)
-            ├── CameraView (ui/camera_view.py)   → frame + zoom + overlays + processing
+            ├── CameraView (ui/camera_view.py)   → frame + zoom + flip + overlays + processing
             └── ControlsPanel (ui/controls_panel.py)
                     └── CameraWorker (ui/camera_worker.py, on QThread)
                             ├── CameraManager (camera/camera_manager.py)
                             │       └── OpenCV backend (camera/camera_backend.py)
                             └── VideoRecorder (recording/recorder.py)
 ```
+
+Notes:
+- `CameraWorker` auto-reconnects on camera drop until the user presses Stop.
+- Fullscreen (F11 / `f`) hides the toolbar/controls so the preview fills the screen.
 
 Business logic layers (independent of UI):
 - `camera/` — device discovery, lifecycle, capabilities, controls.

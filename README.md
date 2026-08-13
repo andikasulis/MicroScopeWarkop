@@ -6,13 +6,14 @@ Built with Python, PySide6 (Qt), and OpenCV.
 
 ## Features
 
-- Camera discovery and selection (no hard-coded index 0).
+- Camera discovery and selection (no hard-coded index 0) with auto-reconnect.
 - Live preview with FPS counter (capture off the UI thread).
-- Camera controls (brightness, contrast, saturation, exposure, focus, zoom).
 - Screenshot capture to PNG/JPEG with timestamped filenames.
 - Video recording (MP4 via OpenCV).
 - Non-destructive zoom (25%–400%).
+- Image flip (horizontal / vertical).
 - Crosshair and grid overlays.
+- Full-screen preview (F11 / `f`).
 - Pixel-to-real-world calibration (persisted).
 - Measurement tools: line, angle, circle, rectangle.
 - Non-destructive image processing (brightness, contrast, grayscale, sharpen, denoise).
@@ -42,11 +43,12 @@ python main.py
 ## Using the App
 
 1. Click **Refresh** to enumerate connected cameras, then pick one in the dropdown.
-2. Click **Start** to begin the live preview (capture runs off the UI thread).
-3. Use the side panel to adjust camera controls (brightness, contrast, focus, …), switch zoom (25%–400%), and toggle crosshair/grid overlays.
-4. Click **Capture Screenshot** to save a PNG, or **Record Video** to start/stop an MP4.
-5. Images and videos are saved to `~/Microscope Captures`.
-6. Click **Start** again (now labeled **Stop**) to end capture; the app cleans up on close.
+2. Click **Start** to begin the live preview (capture runs off the UI thread). If the camera drops, the app auto-reconnects until you press **Stop**.
+3. Use the side panel to switch zoom (25%–400%), toggle crosshair/grid overlays, and flip the image (horizontal/vertical).
+4. Click **Fullscreen** (or press **F11** / `f`) to show the preview full-screen; press again to exit.
+5. Click **Capture Screenshot** to save a PNG, or **Record Video** to start/stop an MP4.
+6. Images and videos are saved to `~/Microscope Captures`.
+7. Click **Stop** to end capture; the app cleans up on close.
 
 ## Packaging
 

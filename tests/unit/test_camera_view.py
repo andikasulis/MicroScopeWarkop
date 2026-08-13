@@ -138,6 +138,42 @@ class TestCameraView:
         finally:
             view.close()
 
+    def test_zoom_out_smaller_than_100(self, qapp: QCoreApplication) -> None:
+        """50% must produce a smaller image than 100% (not identical)."""
+        from PySide6.QtGui import QImage, QPixmap
+
+        view = CameraView()
+        try:
+            view._frame_label.resize(400, 300)
+            h, w = 100, 200
+            arr = np.full((h, w, 3), 128, dtype=np.uint8)
+            contig = np.ascontiguousarray(arr)
+            img = QImage(contig.data, w, h, 3 * w, QImage.Format.Format_RGB888).copy()
+            base = QPixmap.fromImage(img)
+
+            view.set_zoom("100%")
+            p100 = view._render(base, w, h)
+            view.set_zoom("50%")
+            p50 = view._render(base, w, h)
+
+            assert p50.width() < p100.width(), "50% should be smaller than 100%"
+        finally:
+            view.close()
+
+    def test_flip_sets_state_and_rerenders(self, qapp: QCoreApplication) -> None:
+        view = CameraView()
+        try:
+            view.resize(400, 300)
+            view.display_frame(np.zeros((240, 320, 3), dtype=np.uint8))
+            view.set_flip(True, False)  # horizontal flip; must not error
+            assert view._flip_h is True
+            assert view._flip_v is False
+            view.set_flip(False, True)
+            assert view._flip_h is False
+            assert view._flip_v is True
+        finally:
+            view.close()
+
     def test_zoom_ignores_invalid(self, qapp: QCoreApplication) -> None:
         view = CameraView()
         try:

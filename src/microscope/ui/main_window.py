@@ -86,11 +86,11 @@ class MainWindow(QMainWindow):
 
         self._camera_view = CameraView()
         self._controls = ControlsPanel(
-            on_control_changed=self._on_control_changed,
             on_capture=self._capture_screenshot,
             on_record=self._toggle_recording,
             on_zoom=self._on_zoom,
             on_overlay_toggle=self._on_overlay_toggle,
+            on_flip=self._on_flip,
         )
         self._controls.setEnabled(False)
 
@@ -161,7 +161,6 @@ class MainWindow(QMainWindow):
         self._worker.camera_error.connect(self._on_camera_error)
         self._worker.connection_status.connect(self._on_connection_status)
         self._worker.recording_changed.connect(self._controls.set_recording_state)
-        self._worker.control_request.connect(self._worker.set_control)
         self._worker.set_capture_dir(self._config.default_capture_dir)
 
         self._worker_thread = QThread()
@@ -174,7 +173,6 @@ class MainWindow(QMainWindow):
 
         self._start_stop_btn.setText("Stop")
         self._controls.setEnabled(True)
-        self._controls.set_supported_controls(self._worker.controls_supported)
         self._status_label.setText("Live preview active.")
         self._status_label.setStyleSheet("color: #64dd3a;")
 
@@ -209,8 +207,6 @@ class MainWindow(QMainWindow):
             self._status_label.setText("Live preview active.")
             self._status_label.setStyleSheet("color: #64dd3a;")
             self._camera_view.clear()
-            if self._worker is not None:
-                self._controls.set_supported_controls(self._worker.controls_supported)
             self._controls.setEnabled(True)
         elif status == "reconnecting":
             self._controls.setEnabled(False)
@@ -222,11 +218,6 @@ class MainWindow(QMainWindow):
 
     def _is_capturing(self) -> bool:
         return self._worker is not None and self._worker.is_running
-
-    def _on_control_changed(self, name: str, value: float) -> None:
-        if self._worker is not None:
-            # Emit on the UI thread; executes set_control on the worker thread.
-            self._worker.control_request.emit(name, value)
 
     def _toggle_recording(self) -> None:
         if self._worker is None:
@@ -244,16 +235,33 @@ class MainWindow(QMainWindow):
     def _on_zoom(self, label: str) -> None:
         self._camera_view.set_zoom(label)
 
+    def _on_flip(self, horizontal: bool, vertical: bool) -> None:
+        self._camera_view.set_flip(horizontal, vertical)
+
     def _toggle_fullscreen(self) -> None:
-        """Toggle full-screen mode (F11 or 'f', or the toolbar button)."""
+        """Toggle full-screen mode (F11 or 'f', or the toolbar button).
+
+        In full-screen the surrounding toolbar, controls, and status bar are
+        hidden so the camera preview fills the screen.
+        """
         if self.isFullScreen():
             self.showNormal()
             self._fullscreen_btn.setChecked(False)
             self._fullscreen_btn.setText("Fullscreen")
+            self._set_chrome_visible(True)
         else:
+            self._set_chrome_visible(False)
             self.showFullScreen()
             self._fullscreen_btn.setChecked(True)
             self._fullscreen_btn.setText("Exit Fullscreen")
+
+    def _set_chrome_visible(self, visible: bool) -> None:
+        """Show/hide toolbar, controls panel, and status label."""
+        self._refresh_btn.setVisible(visible)
+        self._camera_combo.setVisible(visible)
+        self._start_stop_btn.setVisible(visible)
+        self._controls.setVisible(visible)
+        self._status_label.setVisible(visible)
 
     def _on_overlay_toggle(self, name: str, enabled: bool) -> None:
         self._camera_view.set_overlay(name, enabled)

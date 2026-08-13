@@ -37,6 +37,8 @@ class CameraView(QWidget):
         self._show_grid = False
         self._processor = FrameProcessor()
         self._last_frame: np.ndarray | None = None
+        self._flip_h = False
+        self._flip_v = False
 
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(320, 240)
@@ -80,6 +82,10 @@ class CameraView(QWidget):
         self._last_frame = frame_bgr
         frame_contig = np.ascontiguousarray(frame_bgr)
         processed = np.ascontiguousarray(self._processor.process(frame_contig))
+        if self._flip_h:
+            processed = np.ascontiguousarray(processed[:, ::-1, :])
+        if self._flip_v:
+            processed = np.ascontiguousarray(processed[::-1, :, :])
         bytes_per_line = 3 * w
         qimg = QImage(processed.data, w, h, bytes_per_line, QImage.Format.Format_BGR888)
         qimg = qimg.copy()
@@ -109,8 +115,12 @@ class CameraView(QWidget):
         if label_size.width() <= 0 or label_size.height() <= 0:
             return zoomed
 
-        if self._zoom_factor <= 1.0:
-            # 100% or below: show the whole frame, fit down.
+        if self._zoom_factor < 1.0:
+            # Zoom-out: display at the actual (smaller) size so 25%/50% differ
+            # from 100% instead of being upscaled back to the label size.
+            fitted = zoomed
+        elif self._zoom_factor == 1.0:
+            # 100%: fit the whole frame into the label.
             fitted = zoomed.scaled(
                 label_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
@@ -208,6 +218,13 @@ class CameraView(QWidget):
             self._show_crosshair = enabled
         elif name == "grid":
             self._show_grid = enabled
+
+    def set_flip(self, horizontal: bool, vertical: bool) -> None:
+        """Set whether the preview is flipped horizontally/vertically."""
+        self._flip_h = horizontal
+        self._flip_v = vertical
+        if self._last_frame is not None:
+            self.display_frame(self._last_frame)
 
     def set_processing(self, **kwargs: object) -> None:
         """Update image processing settings (see FrameProcessor.configure)."""
