@@ -59,8 +59,17 @@ pip install pyinstaller
 pyinstaller packaging/microscope.spec
 ```
 
-Output lands in `dist/`. See `docs/DEVELOPMENT.md` for platform notes and
-Gatekeeper guidance.
+For a clean rebuild (do this after changing the spec, e.g. `info_plist`),
+so a stale cached bundle is not reused:
+
+```bash
+rm -rf build dist
+pyinstaller --clean -y packaging/microscope.spec
+```
+
+Output lands in `dist/`. See `docs/DEVELOPMENT.md` for macOS camera
+permission (TCC) notes, Gatekeeper guidance, and how to copy the `.app`
+with `ditto`.
 
 ## Documentation
 

@@ -3,10 +3,13 @@ __pycache__/
 *.py[cod]
 *.so
 .Python
-build/
 dist/
 *.egg-info/
 *.egg
+
+# ==== Build output (app bundle is pushed intentionally) ====
+build/
+!build/*.app/
 
 # ==== Virtual env ====
 .venv/

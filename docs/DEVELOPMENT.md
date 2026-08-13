@@ -28,6 +28,10 @@ microscope
   double-click it; OpenCV/PySide6 are bundled, so they do not need Python.
 - **macOS note:** if the packaged app is blocked by Gatekeeper, right-click →
   Open (or `xattr -dr com.apple.quarantine /path/to/App` for unsigned builds).
+- **macOS camera privacy:** the bundle must declare `NSCameraUsageDescription`
+  in `Info.plist` or the camera call crashes with a TCC `SIGABRT`
+  (`__TCC_CRASHING_DUE_TO_PRIVACY_VIOLATION__`). The spec injects this key
+  via `BUNDLE(..., info_plist={...})` — do not remove it.
 
 ## Code Quality
 
@@ -41,12 +45,20 @@ This project enforces code quality with three tools:
 
 All three must pass before a milestone is considered complete.
 
-## Packaging (M16)
+## Packaging
 
 Requires PyInstaller: `pip install pyinstaller`
 
 ```bash
 pyinstaller packaging/microscope.spec
+```
+
+For a clean rebuild (important when changing the spec, e.g. after editing
+`info_plist` so a stale cached bundle is not reused):
+
+```bash
+rm -rf build dist
+pyinstaller --clean -y packaging/microscope.spec
 ```
 
 Outputs:
@@ -56,6 +68,49 @@ Outputs:
 - Windows: `dist/WarkopMicroscope/WarkopMicroscope.exe`.
 
 OpenCV (`cv2`) is bundled via `collect_submodules` in the spec.
+
+### macOS camera permission
+
+On macOS, the packaged `.app` must contain `NSCameraUsageDescription` in
+`Contents/Info.plist`. Without it the operating system aborts the process
+(`TCC` / `SIGABRT`) as soon as OpenCV opens the camera. The key is set
+directly on the `BUNDLE` node in `packaging/microscope.spec`:
+
+```python
+info_plist={
+    "NSCameraUsageDescription": "…",
+}
+```
+
+Verify the shipped bundle carries it:
+
+```bash
+grep -c NSCameraUsageDescription dist/WarkopMicroscope.app/Contents/Info.plist
+# expected: 1
+```
+
+`codesign --verify --deep --strict dist/WarkopMicroscope.app` should return
+success (ad-hoc signing).
+
+#### First run / camera prompt
+
+On first launch, macOS asks for camera permission. If it was previously
+denied (or an older unsigned build without the key was run first), reset the
+permission per bundle id before testing:
+
+```bash
+tccutil reset Camera com.warkoppformance.microscope
+```
+
+#### Distributing the `.app`
+
+Copy the bundle with `ditto` so `Contents/Info.plist` and symlinks stay
+intact (a plain Finder drag-copy of a bundle can also work, but `ditto` is
+reliable and preserves metadata):
+
+```bash
+ditto dist/WarkopMicroscope.app /path/to/destination/WarkopMicroscope.app
+```
 
 ### Auto-Fixing
 

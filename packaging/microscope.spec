@@ -11,11 +11,13 @@ hidden = collect_submodules("cv2")
 
 block_cipher = None
 
+_ROOT = Path(SPECPATH).resolve().parent
+
 a = Analysis(
-    ["main.py"],
-    pathex=["src"],
+    [str(_ROOT / "main.py")],
+    pathex=[str(_ROOT / "src")],
     binaries=[],
-    datas=[("assets", "assets")],
+    datas=[(str(_ROOT / "assets"), "assets")],
     hiddenimports=hidden,
     hookspath=[],
     runtime_hooks=[],
@@ -58,4 +60,10 @@ if sys.platform == "darwin":
         name="WarkopMicroscope.app",
         icon=None,
         bundle_identifier="com.warkoppformance.microscope",
+        info_plist={
+            "NSCameraUsageDescription": (
+                "Warkop Performance USB MicroScope uses the camera to display "
+                "live microscope preview and capture images/video."
+            )
+        },
     )
